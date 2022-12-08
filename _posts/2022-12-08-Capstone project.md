@@ -21,8 +21,10 @@ Capstone project 期末專題實作：試穿衣服 (Virtual try-on)
 
 ---
 ### 系統方塊圖
+系統流程圖<br>
 ![]()
-AI模型說明
+
+AI模型說明<br>
 ![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/stock_dqn.png?raw=true)
 
 ---
