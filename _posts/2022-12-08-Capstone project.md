@@ -34,7 +34,7 @@ AI模型說明
 
 ---
 ### 系統測試及成果展示
-
+<iframe width="853" height="480" src="https://www.youtube.com/embed/oWdbG_mnx7w" title="去霍格華滋學院當最惡學姊的一天🐍！" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 <br>
 <br>
 
@@ -86,49 +86,7 @@ while(cap.isOpened()):
     print(txt)
 ```
 
----
-### Head Pose Estimation
-**Kaggle:** [rkuo2000/head-pose-estimation](https://kaggle.com/rkuo2000/head-pose-estimation)<br>
-<iframe width="652" height="489" src="https://www.youtube.com/embed/BHwHmCUHRyQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
----
-### VTuber-Unity 
-**Head-Pose-Estimation + Face-Alignment + GazeTracking**<br>
-
-<u>Build-up Steps</u>:
-1. Create a character: **[VRoid Studio](https://vroid.com/studio)**
-2. Synchronize the face: **[VTuber_Unity](https://github.com/kwea123/VTuber_Unity)**
-3. Take video: **[OBS Studio](https://obsproject.com/download)**
-4. Post-processing:
- - Auto-subtitle: **[Autosub](https://github.com/kwea123/autosub)**
- - Auto-subtitle in live stream: **[Unity_live_caption](https://github.com/kwea123/Unity_live_caption)**
- - Encode the subtitle into video: **[小丸工具箱](https://maruko.appinn.me/)**
-5. Upload: YouTube
-6. [Optional] Install CUDA & CuDNN to enable GPU acceleration
-7. To Run <br>
-`$git clone https://github.com/kwea123/VTuber_Unity` <br>
-`$python demo.py --debug --cpu` <br>
-
-<p align="center"><img src="https://github.com/kwea123/VTuber_Unity/blob/master/images/debug_gpu.gif?raw=true"></p>
-
----
-### OpenVtuber
-<u>Build-up Steps</u>:
-* Repro [Github](https://github.com/1996scarlet/OpenVtuber)<br>
-`$git clone https://github.com/1996scarlet/OpenVtuber`<br>
-`$cd OpenVtuber`<br>
-`$pip3 install –r requirements.txt`<br>
-* Install node.js for Windows <br>
-* run Socket-IO Server <br>
-`$cd NodeServer` <br>
-`$npm install express socket.io` <br>
-`$node. index.js` <br>
-* Open a browser at  http://127.0.0.1:6789/kizuna <br>
-* PythonClient with Webcam <br>
-`$cd ../PythonClient` <br>
-`$python3 vtuber_link_start.py` <br>
-
-<p align="center"><img src="https://camo.githubusercontent.com/83ad3e28fa8a9b51d5e30cdf745324b09ac97650aea38742c8e4806f9526bc91/68747470733a2f2f73332e617831782e636f6d2f323032302f31322f31322f72564f33464f2e676966"></p>
 
 ---
 ### Hand Pose
