@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Capstone project 
-author: [Chiuuu]
+author: [johnny, su, chiu]
 category: [Lecture]
 tags: [jekyll, ai]
 ---
