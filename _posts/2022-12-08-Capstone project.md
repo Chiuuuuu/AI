@@ -6,7 +6,7 @@ category: [Lecture]
 tags: [jekyll, ai]
 ---
 
-Capstone project 期末專題實作：
+Capstone project 期末專題實作：無人機相關
 
 ---
 ##  專題題目
@@ -37,7 +37,6 @@ AI模型說明<br>
 
 ---
 ### 系統測試及成果展示
-<iframe width="853" height="480" src="https://www.youtube.com/embed/oWdbG_mnx7w" title="去霍格華滋學院當最惡學姊的一天🐍！" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 <iframe width="664" height="498" src="https://www.youtube.com/embed/OP5HcXJg2Aw?list=PLJV_el3uVTsMhtt7_Y6sgTHGHp1Vb2P2J" title="【機器學習2021】卷積神經網路 (Convolutional Neural Networks, CNN)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 <br>
 <br>
