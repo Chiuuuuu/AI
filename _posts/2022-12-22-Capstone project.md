@@ -611,11 +611,6 @@ downwash.py<br>
 ![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_downwash.png?raw=true)<br><br>
 
 ---
-### Hand Pose
-![](https://github.com/facebookresearch/InterHand2.6M/blob/main/assets/teaser.gif?raw=true)
-**Dataset:** [InterHand2.6M](https://github.com/facebookresearch/InterHand2.6M)<br>
-
-
 
 <br>
 <br>
