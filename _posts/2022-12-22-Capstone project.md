@@ -32,7 +32,7 @@ PyCharm是一個跨平台開發環境，擁有Microsoft Windows、macOS和Linux�
 6. 版本控制集成：Mercurial，Git，Subversion，Perforce和CVS的統一用戶界面，包含更改列表和合併。<br>
 7. 它主要與許多其他面向Python的IDE競爭，包括Eclipse的PyDev和更廣泛的Komodo IDE。<br>
 
-參考來源: [Python自習手札 ](https://ithelp.ithome.com.tw/articles/10196461)
+參考來源: [Python自習手札](https://ithelp.ithome.com.tw/articles/10196461)
 
 ### 系統簡介及功能說明
 
