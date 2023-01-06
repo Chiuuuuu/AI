@@ -1,7 +1,7 @@
 ---
 layout: post
 title: PyBullet-Gym for Drones 
-author: [johnny, su, chiu]
+author: [00953103 蘇冠豪、00953106 張恩碩、01053203 邱顯淳]
 category: [Lecture]
 tags: [jekyll, ai]
 ---
@@ -82,7 +82,6 @@ paper: [Safe-Control-Gym](https://ieeexplore.ieee.org/abstract/document/9849119)
 
 ## 程式說明
 
-程式的部分主要分成**辨識手掌**和**產生泡泡**還有**計分計時**三個部分，其中辨識手掌的部分主要參考自MediaPipe的官方文檔如下。<br>
 程式的部分主要透過 [`gym`](https://gym.openai.com/docs/),  [`pybullet`](https://docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#), 
 [`stable-baselines3`](https://stable-baselines3.readthedocs.io/en/master/guide/quickstart.html), and [`rllib`](https://docs.ray.io/en/master/rllib.html)去控制。<br>
 影片錄製需要用到 [`ffmpeg`](https://ffmpeg.org)
@@ -186,271 +185,436 @@ if __name__ == "__main__":
     #### Plot the simulation results ###########################
     LOGGER.plot()
 ```
-aer1216_fall2020_hw2_sim.py
+fly.py(操控PID控制器飛行一無人機)
 
 ```
+"""Script demonstrating the joint use of simulation and control.
+
+The simulation is run by a `CtrlAviary` or `VisionAviary` environment.
+The control is given by the PID implementation in `DSLPIDControl`.
+
+Example
+-------
+In a terminal, run as:
+
+    $ python fly.py
+
+Notes
+-----
+The drones move, at different altitudes, along cicular trajectories 
+in the X-Y plane, around point (0, -.3).
+
+"""
+import os
 import time
+import argparse
+from datetime import datetime
+import pdb
+import math
 import random
 import numpy as np
 import pybullet as p
+import matplotlib.pyplot as plt
 
-#### Uncomment the following 2 lines if "module gym_pybullet_drones cannot be found"
-# import sys
-# sys.path.append('../')
-
+from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
 from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.envs.VisionAviary import VisionAviary
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from gym_pybullet_drones.control.SimplePIDControl import SimplePIDControl
 from gym_pybullet_drones.utils.Logger import Logger
-from gym_pybullet_drones.utils.utils import sync
-from gym_pybullet_drones.envs.BaseAviary import DroneModel
-from aer1216_fall2020_hw2_ctrl import HW2Control
-
-DURATION = 30
-"""int: The duration of the simulation in seconds."""
-GUI = True
-"""bool: Whether to use PyBullet graphical interface."""
-RECORD = False
-"""bool: Whether to save a video under /files/videos. Requires ffmpeg"""
+from gym_pybullet_drones.utils.utils import sync, str2bool
 
 if __name__ == "__main__":
 
-    #### Create the ENVironment ################################
-    ENV = CtrlAviary(num_drones=3,
-                     drone_model=DroneModel.CF2P,
-                     initial_xyzs=np.array([ [.0, .0, .15], [-.3, .0, .15], [.3, .0, .15] ]),
-                     gui=GUI,
-                     record=RECORD
-                     )
-    PYB_CLIENT = ENV.getPyBulletClient()
+    #### Define and parse (optional) arguments for the script ##
+    parser = argparse.ArgumentParser(description='Helix flight script using CtrlAviary or VisionAviary and DSLPIDControl')
+    parser.add_argument('--drone',              default="cf2x",     type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
+    parser.add_argument('--num_drones',         default=3,          type=int,           help='Number of drones (default: 3)', metavar='')
+    parser.add_argument('--physics',            default="pyb",      type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
+    parser.add_argument('--vision',             default=False,      type=str2bool,      help='Whether to use VisionAviary (default: False)', metavar='')
+    parser.add_argument('--gui',                default=True,       type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
+    parser.add_argument('--record_video',       default=False,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+    parser.add_argument('--plot',               default=True,       type=str2bool,      help='Whether to plot the simulation results (default: True)', metavar='')
+    parser.add_argument('--user_debug_gui',     default=False,      type=str2bool,      help='Whether to add debug lines and parameters to the GUI (default: False)', metavar='')
+    parser.add_argument('--aggregate',          default=False,      type=str2bool,      help='Whether to aggregate physics steps (default: False)', metavar='')
+    parser.add_argument('--obstacles',          default=True,       type=str2bool,      help='Whether to add obstacles to the environment (default: True)', metavar='')
+    parser.add_argument('--simulation_freq_hz', default=240,        type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
+    parser.add_argument('--control_freq_hz',    default=48,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
+    parser.add_argument('--duration_sec',       default=5,          type=int,           help='Duration of the simulation in seconds (default: 5)', metavar='')
+    ARGS = parser.parse_args()
 
-    #### Initialize the LOGGER #################################
-    LOGGER = Logger(logging_freq_hz=ENV.SIM_FREQ,
-                    num_drones=3,
+    #### Initialize the simulation #############################
+    H = .1
+    H_STEP = .05
+    R = .3
+    INIT_XYZS = np.array([[R*np.cos((i/6)*2*np.pi+np.pi/2), R*np.sin((i/6)*2*np.pi+np.pi/2)-R, H+i*H_STEP] for i in range(ARGS.num_drones)])
+    AGGR_PHY_STEPS = int(ARGS.simulation_freq_hz/ARGS.control_freq_hz) if ARGS.aggregate else 1
+
+    #### Create the environment with or without video capture ##
+    if ARGS.vision: 
+        env = VisionAviary(drone_model=ARGS.drone,
+                           num_drones=ARGS.num_drones,
+                           initial_xyzs=INIT_XYZS,
+                           physics=ARGS.physics,
+                           neighbourhood_radius=10,
+                           freq=ARGS.simulation_freq_hz,
+                           aggregate_phy_steps=AGGR_PHY_STEPS,
+                           gui=ARGS.gui,
+                           record=ARGS.record_video,
+                           obstacles=ARGS.obstacles
+                           )
+    else: 
+        env = CtrlAviary(drone_model=ARGS.drone,
+                         num_drones=ARGS.num_drones,
+                         initial_xyzs=INIT_XYZS,
+                         physics=ARGS.physics,
+                         neighbourhood_radius=10,
+                         freq=ARGS.simulation_freq_hz,
+                         aggregate_phy_steps=AGGR_PHY_STEPS,
+                         gui=ARGS.gui,
+                         record=ARGS.record_video,
+                         obstacles=ARGS.obstacles,
+                         user_debug_gui=ARGS.user_debug_gui
+                         )
+
+    #### Obtain the PyBullet Client ID from the environment ####
+    PYB_CLIENT = env.getPyBulletClient()
+
+    #### Initialize a circular trajectory ######################
+    PERIOD = 10
+    NUM_WP = ARGS.control_freq_hz*PERIOD
+    TARGET_POS = np.zeros((NUM_WP,3))
+    for i in range(NUM_WP):
+        TARGET_POS[i, :] = R*np.cos((i/NUM_WP)*(2*np.pi)+np.pi/2)+INIT_XYZS[0, 0], R*np.sin((i/NUM_WP)*(2*np.pi)+np.pi/2)-R+INIT_XYZS[0, 1], INIT_XYZS[0, 2]
+    wp_counters = np.array([int((i*NUM_WP/6)%NUM_WP) for i in range(ARGS.num_drones)])
+
+    #### Initialize the logger #################################
+    logger = Logger(logging_freq_hz=int(ARGS.simulation_freq_hz/AGGR_PHY_STEPS),
+                    num_drones=ARGS.num_drones
                     )
 
-    #### Initialize the CONTROLLERS ############################
-    CTRL_0 = HW2Control(env=ENV,
-                        control_type=0
-                        )
-    CTRL_1 = HW2Control(env=ENV,
-                        control_type=1
-                        )
-    CTRL_2 = HW2Control(env=ENV,
-                        control_type=2
-                        )
-
-    #### Initialize the ACTION #################################
-    ACTION = {}
-    OBS = ENV.reset()
-    STATE = OBS["0"]["state"]
-    ACTION["0"] = CTRL_0.compute_control(current_position=STATE[0:3],
-                                         current_velocity=STATE[10:13],
-                                         current_rpy=STATE[7:10],
-                                         current_rpy_dot=STATE[13:16],
-                                         target_position=STATE[0:3],
-                                         target_velocity=np.zeros(3),
-                                         target_acceleration=np.zeros(3)
-                                         )
-    STATE = OBS["1"]["state"]
-    ACTION["1"] = CTRL_1.compute_control(current_position=STATE[0:3],
-                                         current_velocity=STATE[10:13],
-                                         current_rpy=STATE[7:10],
-                                         current_rpy_dot=STATE[13:16],
-                                         target_position=STATE[0:3],
-                                         target_velocity=np.zeros(3),
-                                         target_acceleration=np.zeros(3)
-                                         )
-    STATE = OBS["2"]["state"]
-    ACTION["2"] = CTRL_2.compute_control(current_position=STATE[0:3],
-                                         current_velocity=STATE[10:13],
-                                         current_rpy=STATE[7:10],
-                                         current_rpy_dot=STATE[13:16],
-                                         target_position=STATE[0:3],
-                                         target_velocity=np.zeros(3),
-                                         target_acceleration=np.zeros(3)
-                                         )
-
-    #### Initialize the target trajectory ######################
-    TARGET_POSITION = np.array([[0, 4.0*np.cos(0.006*i), 1.0] for i in range(DURATION*ENV.SIM_FREQ)])
-    TARGET_VELOCITY = np.zeros([DURATION * ENV.SIM_FREQ, 3])
-    TARGET_ACCELERATION = np.zeros([DURATION * ENV.SIM_FREQ, 3])
-
-    #### Derive the target trajectory to obtain target velocities and accelerations
-    TARGET_VELOCITY[1:, :] = (TARGET_POSITION[1:, :] - TARGET_POSITION[0:-1, :])/ENV.SIM_FREQ
-    TARGET_ACCELERATION[1:, :] = (TARGET_VELOCITY[1:, :] - TARGET_VELOCITY[0:-1, :]) / ENV.SIM_FREQ
+    #### Initialize the controllers ############################
+    ctrl = [DSLPIDControl(env) for i in range(ARGS.num_drones)]
+    # ctrl = [SimplePIDControl(env) for i in range(ARGS.num_drones)]
 
     #### Run the simulation ####################################
+    CTRL_EVERY_N_STEPS = int(np.floor(env.SIM_FREQ/ARGS.control_freq_hz))
+    action = {str(i): np.array([0,0,0,0]) for i in range(ARGS.num_drones)}
     START = time.time()
-    for i in range(0, DURATION*ENV.SIM_FREQ):
+    for i in range(0, int(ARGS.duration_sec*env.SIM_FREQ), AGGR_PHY_STEPS):
 
-        ### Secret control performance booster #####################
-        # if i/ENV.SIM_FREQ>3 and i%30==0 and i/ENV.SIM_FREQ<10: p.loadURDF("duck_vhacd.urdf", [random.gauss(0, 0.3), random.gauss(0, 0.3), 3], p.getQuaternionFromEuler([random.randint(0, 360),random.randint(0, 360),random.randint(0, 360)]), physicsClientId=PYB_CLIENT)
+        #### Make it rain rubber ducks #############################
+        # if i/env.SIM_FREQ>5 and i%10==0 and i/env.SIM_FREQ<10: p.loadURDF("duck_vhacd.urdf", [0+random.gauss(0, 0.3),-0.5+random.gauss(0, 0.3),3], p.getQuaternionFromEuler([random.randint(0,360),random.randint(0,360),random.randint(0,360)]), physicsClientId=PYB_CLIENT)
 
         #### Step the simulation ###################################
-        OBS, _, _, _ = ENV.step(ACTION)
+        obs, reward, done, info = env.step(action)
 
-        #### Compute control for drone 0 ###########################
-        STATE = OBS["0"]["state"]
-        ACTION["0"] = CTRL_0.compute_control(current_position=STATE[0:3],
-                                             current_velocity=STATE[10:13],
-                                             current_rpy=STATE[7:10],
-                                             current_rpy_dot=STATE[13:16],
-                                             target_position=TARGET_POSITION[i, :],
-                                             target_velocity=TARGET_VELOCITY[i, :],
-                                             target_acceleration=TARGET_ACCELERATION[i, :]
-                                             )
-        #### Log drone 0 ###########################################
-        LOGGER.log(drone=0, timestamp=i/ENV.SIM_FREQ, state=STATE)
+        #### Compute control at the desired frequency ##############
+        if i%CTRL_EVERY_N_STEPS == 0:
 
-        #### Compute control for drone 1 ###########################
-        STATE = OBS["1"]["state"]
-        ACTION["1"] = CTRL_1.compute_control(current_position=STATE[0:3],
-                                             current_velocity=STATE[10:13],
-                                             current_rpy=STATE[7:10],
-                                             current_rpy_dot=STATE[13:16],
-                                             target_position=TARGET_POSITION[i, :] + np.array([-.3, .0, .0]),
-                                             target_velocity=TARGET_VELOCITY[i, :],
-                                             target_acceleration=TARGET_ACCELERATION[i, :]
-                                             )
-        #### Log drone 1 ###########################################
-        LOGGER.log(drone=1, timestamp=i/ENV.SIM_FREQ, state=STATE)
+            #### Compute control for the current way point #############
+            for j in range(ARGS.num_drones):
+                action[str(j)], _, _ = ctrl[j].computeControlFromState(control_timestep=CTRL_EVERY_N_STEPS*env.TIMESTEP,
+                                                                       state=obs[str(j)]["state"],
+                                                                       target_pos=np.hstack([TARGET_POS[wp_counters[j], 0:2], H+j*H_STEP])
+                                                                       )
 
-        #### Compute control for drone 2 ###########################
-        STATE = OBS["2"]["state"]
-        ACTION["2"] = CTRL_2.compute_control(current_position=STATE[0:3],
-                                             current_velocity=STATE[10:13],
-                                             current_rpy=STATE[7:10],
-                                             current_rpy_dot=STATE[13:16],
-                                             target_position=TARGET_POSITION[i, :] + np.array([.3, .0, .0]),
-                                             target_velocity=TARGET_VELOCITY[i, :],
-                                             target_acceleration=TARGET_ACCELERATION[i, :]
-                                             )
-        #### Log drone 2 ###########################################
-        LOGGER.log(drone=2, timestamp=i/ENV.SIM_FREQ, state=STATE)
+            #### Go to the next way point and loop #####################
+            for j in range(ARGS.num_drones): 
+                wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
+
+        #### Log the simulation ####################################
+        for j in range(ARGS.num_drones):
+            logger.log(drone=j,
+                       timestamp=i/env.SIM_FREQ,
+                       state= obs[str(j)]["state"],
+                       control=np.hstack([TARGET_POS[wp_counters[j], 0:2], H+j*H_STEP, np.zeros(9)])
+                       )
 
         #### Printout ##############################################
-        if i%ENV.SIM_FREQ == 0:
-            ENV.render()
+        if i%env.SIM_FREQ == 0:
+            env.render()
+            #### Print matrices with the images captured by each drone #
+            if ARGS.vision:
+                for j in range(ARGS.num_drones):
+                    print(obs[str(j)]["rgb"].shape, np.average(obs[str(j)]["rgb"]),
+                          obs[str(j)]["dep"].shape, np.average(obs[str(j)]["dep"]),
+                          obs[str(j)]["seg"].shape, np.average(obs[str(j)]["seg"])
+                          )
 
         #### Sync the simulation ###################################
-        if GUI:
-            sync(i, START, ENV.TIMESTEP)
+        if ARGS.gui:
+            sync(i, START, env.TIMESTEP)
 
-    #### Close the ENVironment #################################
-    ENV.close()
+    #### Close the environment #################################
+    env.close()
 
     #### Save the simulation results ###########################
-    LOGGER.save()
+    logger.save()
 
     #### Plot the simulation results ###########################
-    LOGGER.plot()
+    if ARGS.plot:
+        logger.plot()
+
 ```
+compare.py(重播並比較儲存在example_trace.pkl檔中的軌跡)
+```
+"""Script comparing a gym_pybullet_drones simulation to a trace file.
 
+It is meant to compare/validate the behaviour of a pyhsics implementation.
 
-## Student's Accomplishment
-### [MediaPipe Hands poke bubbles](https://hahakevin45.github.io/AI/lecture/2022/12/08/Pose-Estimation.html)
-<iframe width="854" height="480" src="https://www.youtube.com/embed/YJ_JCDBOgiE" title="MediaPipe Hands poke bubbles" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+Example
+-------
+In a terminal, run as:
 
----
-### [使用 YOLOv5辨識水下魚種](https://alanlee0323.github.io/AI-course/lecture/2022/12/08/capstone-project.html)
-<iframe width="723" height="482" src="https://www.youtube.com/embed/46wfrbQC8fI" title="影像偵測1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    $ python compare.py
 
----
-## Teacher's samples
+Notes
+-----
+The comparison is along a 2D trajectory in the X-Z plane, between x == +1 and -1.
 
-### Highway Traffice Analysis
-**Kaggle:** [YOLOv5 Traffic Analysis](https://kaggle.com/rkuo2000/yolov5-traffic-analysis)<br>
-use YOLOv5 to detect car/truck per frame, then analyze vehicle counts per lane and the estimated speed
-![](https://github.com/rkuo2000/AI-course/blob/gh-pages/images/YOLOv5_traffic_analysis.jpg?raw=true)
+"""
+import os
+import time
+import argparse
+import pickle
+import numpy as np
 
----
-### Facemask Detection
-**Kaggle**: [YOLOv5 Facemask](https://www.kaggle.com/code/rkuo2000/yolov5-facemask)<br>
-![](https://github.com/rkuo2000/AI-course/blob/gh-pages/images/YOLOv5_Facemask.jpg?raw=true)
+from gym_pybullet_drones.utils.utils import sync, str2bool
+from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
+from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from gym_pybullet_drones.utils.Logger import Logger
 
----
-### Face Identification
-**Kaggle:** [FaceNet-PyTorch](https://kaggle.com/rkuo2000/FaceNet-PyTorch)<br>
+if __name__ == "__main__":
 
----
-### DeepFashion TryOn
-**Kaggle:** [rkuo2000/deepfashion-tryon](https://www.kaggle.com/rkuo2000/deepfashion-tryon)<br>
-![](https://github.com/rkuo2000/AI-course/blob/gh-pages/images/VTON_ACGPN.jpg?raw=true)
+    #### Define and parse (optional) arguments for the script ##
+    parser = argparse.ArgumentParser(description='Trace comparison script using CtrlAviary and DSLPIDControl')
+    parser.add_argument('--physics',        default="pyb",               type=Physics,       help='Physics updates (default: PYB)', metavar='', choices=Physics)
+    parser.add_argument('--gui',            default=False,               type=str2bool,      help='Whether to use PyBullet GUI (default: False)', metavar='')
+    parser.add_argument('--record_video',   default=False,               type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+    parser.add_argument('--trace_file',     default="example_trace.pkl", type=str,           help='Pickle file with the trace to compare to (default: "example_trace.pkl")', metavar='')
+    ARGS = parser.parse_args()
 
-<br>
-<br>
+    #### Load a trace and control reference from a .pkl file ###
+    with open(os.path.dirname(os.path.abspath(__file__))+"/../files/"+ARGS.trace_file, 'rb') as in_file:
+        TRACE_TIMESTAMPS, TRACE_DATA, TRACE_CTRL_REFERENCE, _, _, _ = pickle.load(in_file)
 
-*This site was last updated {{ site.time | date: "%B %d, %Y" }}.*
+    #### Compute trace's parameters ############################
+    DURATION_SEC = int(TRACE_TIMESTAMPS[-1])
+    SIMULATION_FREQ_HZ = int(len(TRACE_TIMESTAMPS)/TRACE_TIMESTAMPS[-1])
+
+    #### Initialize the simulation #############################
+    env = CtrlAviary(drone_model=DroneModel.CF2X,
+                     num_drones=1,
+                     initial_xyzs=np.array([0, 0, .1]).reshape(1, 3),
+                     physics=ARGS.physics,
+                     freq=SIMULATION_FREQ_HZ,
+                     gui=ARGS.gui,
+                     record=ARGS.record_video,
+                     obstacles=False
+                     )
+    INITIAL_STATE = env.reset()
+    action = {"0": np.zeros(4)}
+    pos_err = 9999.
+
+    #### TRACE_FILE starts at [0,0,0], sim starts at [0,0,INITIAL_STATE[2]]
+    TRACE_CTRL_REFERENCE[:, 2] = INITIAL_STATE["0"]["state"][2]
+
+    #### Initialize the logger #################################
+    logger = Logger(logging_freq_hz=SIMULATION_FREQ_HZ,
+                    num_drones=2,
+                    duration_sec=DURATION_SEC
+                    )
+
+    #### Initialize the controller #############################
+    ctrl = DSLPIDControl(env)
+
+    #### Run the comparison ####################################
+    START = time.time()
+    for i in range(DURATION_SEC*env.SIM_FREQ):
+
+        #### Step the simulation ###################################
+        obs, reward, done, info = env.step(action)
+
+        #### Compute next action using the set points from the trace
+        action["0"], pos_err, yaw_err = ctrl.computeControlFromState(control_timestep=env.TIMESTEP,
+                                                                     state=obs["0"]["state"],
+                                                                     target_pos=TRACE_CTRL_REFERENCE[i, 0:3],
+                                                                     target_vel=TRACE_CTRL_REFERENCE[i, 3:6]
+                                                                     )
+
+        #### Re-arrange the trace for consistency with the logger
+        trace_obs = np.hstack([TRACE_DATA[i, 0:3], np.zeros(4), TRACE_DATA[i, 6:9], TRACE_DATA[i, 3:6], TRACE_DATA[i, 9:12], TRACE_DATA[i, 12:16]])
+
+        #### Log the trace #########################################
+        logger.log(drone=0,
+                   timestamp=TRACE_TIMESTAMPS[i],
+                   state=trace_obs,
+                   control=np.hstack([TRACE_CTRL_REFERENCE[i, :], np.zeros(6)])
+                   )
+
+        #### Log the simulation ####################################
+        logger.log(drone=1,
+                   timestamp=i/env.SIM_FREQ,
+                   state=obs["0"]["state"],
+                   control=np.hstack([TRACE_CTRL_REFERENCE[i, :], np.zeros(6)])
+                   )
+
+        #### Printout ##############################################
+        if i%env.SIM_FREQ == 0: 
+            env.render()
+
+        #### Sync the simulation ###################################
+        if ARGS.gui: 
+            sync(i, START, env.TIMESTEP)
+
+    #### Close the environment #################################
+    env.close()
+
+    #### Save the simulation results ###########################
+    logger.save()
+
+    #### Plot the simulation results ###########################
+    logger.plot(pwm=True)
+
+```
+downwash.py(利用兩台無人機去測試downtest模型)
+```
+"""Script demonstrating the implementation of the downwash effect model.
+
+Example
+-------
+In a terminal, run as:
+
+    $ python downwash.py
+
+Notes
+-----
+The drones move along 2D trajectories in the X-Z plane, between x == +.5 and -.5.
+
+"""
+import time
+import argparse
+import numpy as np
+
+from gym_pybullet_drones.utils.utils import sync, str2bool
+from gym_pybullet_drones.envs.BaseAviary import DroneModel, Physics
+from gym_pybullet_drones.envs.CtrlAviary import CtrlAviary
+from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
+from gym_pybullet_drones.utils.Logger import Logger
+
+if __name__ == "__main__":
+
+    #### Define and parse (optional) arguments for the script ##
+    parser = argparse.ArgumentParser(description='Downwash example script using CtrlAviary and DSLPIDControl')
+    parser.add_argument('--drone',              default="cf2x",     type=DroneModel,    help='Drone model (default: CF2X)', metavar='', choices=DroneModel)
+    parser.add_argument('--gui',                default=True,       type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
+    parser.add_argument('--record_video',       default=False,      type=str2bool,      help='Whether to record a video (default: False)', metavar='')
+    parser.add_argument('--simulation_freq_hz', default=240,        type=int,           help='Simulation frequency in Hz (default: 240)', metavar='')
+    parser.add_argument('--control_freq_hz',    default=48,         type=int,           help='Control frequency in Hz (default: 48)', metavar='')
+    parser.add_argument('--duration_sec',       default=10,         type=int,           help='Duration of the simulation in seconds (default: 10)', metavar='')
+    ARGS = parser.parse_args()
+
+    #### Initialize the simulation #############################
+    INIT_XYZS = np.array([[.5, 0, 1],[-.5, 0, .5]])
+    env = CtrlAviary(drone_model=ARGS.drone,
+                     num_drones=2,
+                     initial_xyzs=INIT_XYZS,
+                     physics=Physics.PYB_DW,
+                     neighbourhood_radius=10,
+                     freq=ARGS.simulation_freq_hz,
+                     gui=ARGS.gui,
+                     record=ARGS.record_video,
+                     obstacles=True
+                     )
+
+    #### Initialize the trajectories ###########################
+    PERIOD = 10
+    NUM_WP = ARGS.control_freq_hz*PERIOD
+    TARGET_POS = np.zeros((NUM_WP, 2))
+    for i in range(NUM_WP):
+        TARGET_POS[i, :] = [0.5*np.cos(2*np.pi*(i/NUM_WP)), 0]
+    wp_counters = np.array([0, int(NUM_WP/2)])
+
+    #### Initialize the logger #################################
+    logger = Logger(logging_freq_hz=ARGS.simulation_freq_hz,
+                    num_drones=2,
+                    duration_sec=ARGS.duration_sec
+                    )
+
+    #### Initialize the controllers ############################
+    ctrl = [DSLPIDControl(env) for i in range(2)]
+
+    #### Run the simulation ####################################
+    CTRL_EVERY_N_STEPS = int(np.floor(env.SIM_FREQ/ARGS.control_freq_hz))
+    action = {str(i): np.array([0, 0, 0, 0]) for i in range(2)}
+    START = time.time()
+    for i in range(ARGS.duration_sec*env.SIM_FREQ):
+
+        #### Step the simulation ###################################
+        obs, reward, done, info = env.step(action)
+
+        #### Compute control at the desired frequency ##############
+        if i%CTRL_EVERY_N_STEPS == 0:
+
+            #### Compute control for the current way point #############
+            for j in range(2):
+                action[str(j)], _, _ = ctrl[j].computeControlFromState(control_timestep=CTRL_EVERY_N_STEPS*env.TIMESTEP,
+                                                                       state=obs[str(j)]["state"],
+                                                                       target_pos=np.hstack([TARGET_POS[wp_counters[j], :], INIT_XYZS[j, 2]])
+                                                                       )
+
+            #### Go to the next way point and loop #####################
+            for j in range(2):
+                wp_counters[j] = wp_counters[j] + 1 if wp_counters[j] < (NUM_WP-1) else 0
+
+        #### Log the simulation ####################################
+        for j in range(2):
+            logger.log(drone=j,
+                       timestamp=i/env.SIM_FREQ,
+                       state=obs[str(j)]["state"],
+                       control=np.hstack([TARGET_POS[wp_counters[j], :], INIT_XYZS[j ,2], np.zeros(9)])
+                       )
+
+        #### Printout ##############################################
+        if i%env.SIM_FREQ == 0:
+            env.render()
+
+        #### Sync the simulation ###################################
+        if ARGS.gui:
+            sync(i, START, env.TIMESTEP)
+
+    #### Close the environment #################################
+    env.close()
+
+    #### Save the simulation results ###########################
+    logger.save()
+
+    #### Plot the simulation results ###########################
+    logger.plot()
+
+```
 
 ---
 ### 系統測試及成果展示
-<iframe width="664" height="498" src="https://www.youtube.com/embed/OP5HcXJg2Aw?list=PLJV_el3uVTsMhtt7_Y6sgTHGHp1Vb2P2J" title="【機器學習2021】卷積神經網路 (Convolutional Neural Networks, CNN)" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-<br>
-<br>
+aer1216_fall2020_hw1_sim.py<br>
+<iframe width="702" height="395" src="https://www.youtube.com/embed/MqDBqMSzaEE" title="2023/01/04 aer1216_fall2020_hw1_sim_control" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
+![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_aer1216_fall2020_hw1_sim.png?raw=true)<br><br>
 
+fly.py<br>
+<iframe width="702" height="395" src="https://www.youtube.com/embed/Xg3rgkXIYWg" title="2023/01/06 fly.py" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
+![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_fly.png?raw=true)<br><br>
 
-**專題實作步驟:**
-1. 建立身體動作之姿態照片資料集 (例如：5 poses , take 20 pictures of each pose)<br>
-2. 始用**MMPose** 辨識出照片中的各姿勢之身體關鍵點 (use MMPose convert 16 keypoints (x,y) of each pose)<br>
-3. 產生姿態關鍵點資料集 x_train.append(pose_keypoints) ( x_train.shape = (20x5, 16, 2), y_train.shape= (20x5, 1) )<br>
-4. 建立DNN模型並訓練模型, 然後下載模型檔`pose_dnn.h5`至PC <br>
-5. 於PC建立帶camera輸入之服務器程式, 載入模型`pose_dnn.h5`進行姿態動作辨識 <br>
-
-**模型建構與訓練之程式樣本** (PC or Kaggle)<br>
-
-```
-input_shape=(16,2)
-num_classes=5
-
-inputs = layers.Input(shape=input_shape)
-x = layers.Dense(128)(inputs)
-outputs = layers.Dense(num_classes, activation="softmax")(x)
-model = models.Model(inputs=inputs, outputs=outputs)
-
-models.compile(loss = 'categorical_crossentropy', optimizer = 'adam' , metrics = ['accuracy'])
-
-history = model.fit(x_train, y_train, batch_size=1, epochs=20, validation_data=(x_test, y_test))
-models.save_model(model, 'pose_dnn.h5')
-```
-
-**姿態辨識服務器之程式樣本** (PC with Camera)<br>
-
-```
-model = models.load_model('models/pose_dnn.h5')
-labels = ['stand', 'raise-right-arm', 'raise-left-arm', 'cross arms','both-arms-left']
-
-cap = cv2.VideoCapture(0)
-
-while(cap.isOpened()):
-    ret, frame = cap.read()
-    image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-    
-    mmdet_results = inference_detector(det_model, image) # 人物偵測產生BBox
-    person_results = process_mmdet_results(mmdet_results, args.det_cat_id) # 記住人物之BBox  
-    pose_results, returned_outputs = inference_top_down_pose_model(...) # 感測姿態產生pose keypoints
-    
-    x_test = np.array(preson_results).reshape(1,16,2) # 將Keypoints List 轉成 numpy Array
-    preds = model.fit(x_test) # 辨識姿態動作
-    maxindex = int(np.argmax(preds))
-    txt = labels[maxindex]
-    print(txt)
-```
-
-
+downwash.py<br>
+<iframe width="702" height="395" src="https://www.youtube.com/embed/2FJSdsvM2-s" title="2023/01/06 downwash.py" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
+![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_downwash.png?raw=true)<br><br>
 
 ---
 ### Hand Pose
 ![](https://github.com/facebookresearch/InterHand2.6M/blob/main/assets/teaser.gif?raw=true)
 **Dataset:** [InterHand2.6M](https://github.com/facebookresearch/InterHand2.6M)<br>
 
-1. Download pre-trained InterNet from [here](https://drive.google.com/drive/folders/1BET1f5p2-1OBOz6aNLuPBAVs_9NLz5Jo?usp=sharing)
-2. Put the model at `demo` folder
-3. Go to `demo` folder and edit `bbox` in [here](https://github.com/facebookresearch/InterHand2.6M/blob/5de679e614151ccfd140f0f20cc08a5f94d4b147/demo/demo.py#L74)
-4. run `python demo.py --gpu 0 --test_epoch 20`
-5. You can see `result_2D.jpg` and 3D viewer.
-
-**Camera positios visualization demo**
-1. `cd tool/camera_visualize`
-2. Run `python camera_visualize.py`
 
 
 <br>
