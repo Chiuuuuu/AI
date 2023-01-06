@@ -1,16 +1,38 @@
 ---
 layout: post
-title: Capstone project 
+title: PyBullet-Gym for Drones 
 author: [johnny, su, chiu]
 category: [Lecture]
 tags: [jekyll, ai]
 ---
 
-Capstone project 期末專題實作：無人機相關
-
 ---
-##  專題題目
+##  PyBullet-Gym for Drones (四軸無人機之強化學習)
 
+**執行環境:**
+以下是使用版本供參考
+* python 3.9.10
+* gym-pybullet-drones-v0.5.2 (儲存.zip檔並解壓縮)
+* PyCharm (選擇安裝程序中的所有選項並重新啟動)
+* Visual Studio (選擇“使用 C++ 進行桌面開發”)
+
+### PyCharm介紹
+
+PyCharm: [PyCharm ](https://www.jetbrains.com/pycharm/)
+
+**PyCharm** 是一個用於電腦編程的整合式開發環境，主要用於Python語言開發，由捷克公司JetBrains開發，提供代碼分析、圖形化除錯器，整合測試器、整合版本控制系統，並支援使用Django進行網頁開發。<br>
+PyCharm是一個跨平台開發環境，擁有Microsoft Windows、macOS和Linux版本。社群版在Apache授權條款下釋出，另外還有專業版在專用授權條款下釋出，其擁有許多額外功能，比如Web開發、Python We框架、Python剖析器、遠端開發、支援資料庫與SQL等更多進階功能。
+
+如果使用 Python 語言進行開發，PyCharm 支援下列幾種辨識功能
+1. 項目和代碼導航：專門的項目視圖，文件結構視圖和文件、類、方法和用法之間的快速跳轉。<br>
+2. Python 重構：包括重命名、提取方法、引入變量、引入常量、上拉、下壓等。<br>
+3. 支持Web框架：Django，web2py和Flask。<br>
+4. 集成的Python調試器。<br>
+5. Google App Engine Python開發。<br>
+6. 版本控制集成：Mercurial，Git，Subversion，Perforce和CVS的統一用戶界面，包含更改列表和合併。<br>
+7. 它主要與許多其他面向Python的IDE競爭，包括Eclipse的PyDev和更廣泛的Komodo IDE。<br>
+
+參考來源: [Python自習手札 ](https://ithelp.ithome.com.tw/articles/10196461)
 
 ### 系統簡介及功能說明
 
