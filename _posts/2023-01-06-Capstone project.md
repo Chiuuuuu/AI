@@ -14,6 +14,8 @@ tags: [jekyll, ai]
 透過調整GUI按鍵數值(左右滑動)來控制四軸無人機飛行。
 
 ---
+**開發動機:**
+每當經過育樂館前，無意間都會看到旁邊的大草原有人在操作無人機，覺得很感興趣，剛好這門課期末要做一個小專題，又因為我們金錢上沒辦法負擔實體無人機的費用，於是想利用這個機會來模擬四軸無人機的飛行。<br>
 
 **開發過程:**
 1. Cart-Pole System(車桿系統)<br>
@@ -83,7 +85,7 @@ paper: [Safe-Control-Gym](https://ieeexplore.ieee.org/abstract/document/9849119)
 ## 程式說明
 
 程式的部分主要透過 [`gym`](https://gym.openai.com/docs/),  [`pybullet`](https://docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#), 
-[`stable-baselines3`](https://stable-baselines3.readthedocs.io/en/master/guide/quickstart.html), and [`rllib`](https://docs.ray.io/en/master/rllib.html)去控制。<br>
+[`stable-baselines3`](https://stable-baselines3.readthedocs.io/en/master/guide/quickstart.html), 和 [`rllib`](https://docs.ray.io/en/master/rllib.html)去控制。<br>
 影片錄製需要用到 [`ffmpeg`](https://ffmpeg.org)
 
 ---
@@ -884,12 +886,23 @@ fly.py<br>
 <iframe width="702" height="395" src="https://www.youtube.com/embed/Xg3rgkXIYWg" title="2023/01/06 fly.py" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
 ![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_fly.png?raw=true)<br><br>
 
+compare.py<br>
+![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_compare.png?raw=true)<br><br>
+
 downwash.py<br>
 <iframe width="702" height="395" src="https://www.youtube.com/embed/2FJSdsvM2-s" title="2023/01/06 downwash.py" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
 ![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_downwash.png?raw=true)<br><br>
 
 ---
+## 實作心得 
+這次實作過程可說是困難重重。首先，下載package這一步就遇到瓶頸，我們使用的是Pycharm，在下載資源包的過程中，出現了error說安裝失敗，一開始以為是直譯器問題，但後來過了幾分鐘後我們再次嘗試用Pycharm安裝資源包就成功安裝，所以我們猜測是硬體問題。同時組員有利用anaconda跑程式，下載完package開始compile時，卻出現了模組版本不相容的問題，礙於時間關係，我們果斷放棄用anaconda，選擇用其他開發環境。接下來，安裝完資源包後開始編譯程式，跑程式的時候一直碰到ModuleNotFoundError: No module named 'gym_pybullet_drones'這個問題(但這模組很明顯是有在根目錄裡)，我們同時也利用了anaconda、ubuntu、vscode、colab皆碰到同樣的問題，但當我們換了一台電腦(換另一個組員編譯程式)執行檔案時，在Pycharm上就沒有出現這個奇怪的error。在此我們推測，問題出在硬體。<br>
+此次實作說長不長說短不短，執行過程雖然坎坷，卻學習到如何debug程式、理解程式碼的運作、團隊合作、工作分配等，模擬了往後待在研發團隊的進行模式，獲取團隊開發經驗。在此相當感謝郭子仁教授帶著我們接觸人工智慧，往後我們將會利用老師這學期教導的內容做為基石，持續精進人工智慧的相關技術。<br><br>
 
+---
+## 期望
+礙於其他學科的關係，使我們沒辦法在初期就全心投入這次的小專題，如果還有機會的話，希望下次能早點開始進度，碰到問題時能有更多時間去思考、詢問老師以及上網搜尋相關的資料。期望往後不論是在執行大專計畫或是選修科目的各種專題實作，能安排更充分的時間去理解網路上開源的程式碼。<br>
+
+---
 <br>
 <br>
 
