@@ -52,10 +52,10 @@ AI模型說明<br>
 ---
 ### 製作步驟
 
-1.建立資料集dataset
-2.移植程式 to kaggle
-3.kaggle上訓練模型
-4.kaggle上測試模型
+1.建立資料集dataset<br>
+2.移植程式 to kaggle<br>
+3.kaggle上訓練模型<br>
+4.kaggle上測試模型<br>
 
 ---
 ### 系統測試及成果展示
