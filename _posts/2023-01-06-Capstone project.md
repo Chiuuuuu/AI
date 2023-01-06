@@ -873,7 +873,7 @@ if __name__ == "__main__":
 ---
 ### 系統測試及成果展示
 aer1216_fall2020_hw1_sim.py<br>
-<iframe width="702" height="395" src="https://www.youtube.com/embed/MqDBqMSzaEE" title="2023/01/04 aer1216_fall2020_hw1_sim_control" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
+<iframe width="853" height="480" src="https://www.youtube.com/embed/eX0EYnc5RNg" title="2023/01/04 aer1216_fall2020_hw1_sim.py" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe><br><br>
 ![](https://github.com/Chiuuuuu/AI/blob/gh-pages/images/Figure_aer1216_fall2020_hw1_sim.png?raw=true)<br><br>
 
 DSLPIDControl.py(control)<br>
